@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Retro FPS</title>
+<style>
+body { margin:0; background:black; color:white; font-family:monospace; text-align:center }
+canvas { display:block; margin:auto; background:#000 }
+</style>
+</head>
+<body>
+
+<h2>🔫 RETRO FPS — Level <span id="lvl">1</span></h2>
+<p>Weapon: <span id="wpn">Pistol</span> | Score: <span id="score">0</span></p>
+<canvas id="game" width="480" height="320"></canvas>
+
+<script>
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
+
+let level=1, score=0;
+const weapons=["Pistol","Shotgun","Chaingun","Rifle","Plasma"];
+let weapon=0;
+
+const FOV=Math.PI/3;
+const DEPTH=8;
+const MAP=16;
+
+let map=[], enemies=[];
+let px=1.5, py=1.5, pa=0;
+
+function genLevel(){
+  map=[];
+  enemies=[];
+  for(let y=0;y<MAP;y++){
+    map[y]=[];
+    for(let x=0;x<MAP;x++){
+      map[y][x]=(x==0||y==0||x==MAP-1||y==MAP-1||Math.random()<0.15)?1:0;
+    }
+  }
+  px=1.5; py=1.5; pa=0;
+  for(let i=0;i<level+2;i++)
+    enemies.push({x:Math.random()*MAP,y:Math.random()*MAP,hp:2+level});
+}
+
+function ray(x,y,a){
+  for(let d=0;d<DEPTH;d+=0.05){
+    let rx=x+Math.cos(a)*d;
+    let ry=y+Math.sin(a)*d;
+    if(map[Math.floor(ry)]?.[Math.floor(rx)]) return d;
+  }
+  return DEPTH;
+}
+
+function render(){
+  ctx.clearRect(0,0,c.width,c.height);
+  for(let i=0;i<c.width;i++){
+    let a=pa-FOV/2+(i/c.width)*FOV;
+    let d=ray(px,py,a);
+    let h=c.height/(d*1.5);
+    ctx.fillStyle=`rgb(${200/d},${100/d},${50/d})`;
+    ctx.fillRect(i,(c.height-h)/2,1,h);
+  }
+}
+
+function shoot(){
+  for(let e of enemies){
+    let dx=e.x-px, dy=e.y-py;
+    let dist=Math.hypot(dx,dy);
+    let ang=Math.atan2(dy,dx)-pa;
+    if(Math.abs(ang)<0.1 && dist<DEPTH){
+      e.hp-=1+weapon;
+      if(e.hp<=0){
+        score+=10;
+        enemies=enemies.filter(x=>x!==e);
+      }
+      break;
+    }
+  }
+  if(enemies.length===0){
+    level++;
+    weapon=Math.min(weapons.length-1,weapon+1);
+    document.getElementById("lvl").textContent=level;
+    document.getElementById("wpn").textContent=weapons[weapon];
+    document.getElementById("score").textContent=score;
+    genLevel();
+  }
+}
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="w"){ px+=Math.cos(pa)*0.2; py+=Math.sin(pa)*0.2; }
+  if(e.key==="s"){ px-=Math.cos(pa)*0.2; py-=Math.sin(pa)*0.2; }
+  if(e.key==="a"){ pa-=0.1; }
+  if(e.key==="d"){ pa+=0.1; }
+  if(e.key===" "){ shoot(); }
+});
+
+function loop(){
+  render();
+  requestAnimationFrame(loop);
+}
+
+genLevel();
+loop();
+
+// Gamtize completion hook
+window.addEventListener("beforeunload",()=>{
+  window.parent.postMessage(
+    { type:"GAME_COMPLETE", level:level, score:score },
+    "*"
+  );
+});
+</script>
+
+</body>
+</html>
